@@ -1,4 +1,7 @@
 /node_modules
+/database
+/requests
+.env
 
 # misc
 .DS_Store
