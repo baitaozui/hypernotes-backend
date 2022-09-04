@@ -1,41 +1,22 @@
 require('dotenv').config()
-const { request } = require('express')
-const { response } = require('express')
+const cors = require('cors')
 // console.log(process.env.DATABASE_URL)
 const express = require('express')
-const { Sequelize, QueryTypes, DataTypes, Model } = require('sequelize')
+const { Sequelize, DataTypes, Model } = require('sequelize')
+const { User } = require('./models/User')
 const app = express()
 
+const requestLogger = (request, response, next) => {
+  console.log('Method:', request.method)
+  console.log('Path:  ', request.path)
+  console.log('Body:  ', request.body)
+  console.log('---')
+  next()
+}
+app.use(requestLogger)
+app.use(cors())
+
 const sequelize = new Sequelize(process.env.DATABASE_URL)
-// 模型
-class User extends Model { }
-User.init({
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  name: {
-    type: DataTypes.STRING(30),
-    allowNull: false
-  },
-  displayName: {
-    type: DataTypes.STRING(30)
-  },
-  email: {
-    type: DataTypes.STRING(30)
-  },
-  password: {
-    type: DataTypes.STRING(30)
-  }
-}, {
-  sequelize,
-  underscored: true,
-  timestamps: true,
-  createdAt: 'createdAt',
-  updatedAt: false,
-  modelName: 'user'
-})
 
 class Group extends Model { }
 Group.init({
@@ -74,7 +55,7 @@ app.get('/api/users', async (request, response) => {
 
 app.get('/api/users/:id', async (request, response) => {
   const id = Number(request.params.id)
-  const user = await User.findOne({where:{id:id}})
+  const user = await User.findOne({ where: { id: id } })
   if (user) {
     response.json(user)
   } else {
@@ -105,10 +86,14 @@ app.post('/api/users', async (request, response) => {
   response.json(user)
 })
 
-// TODO update user
-// app.put('/api/users/:id', async (request, response)=> {
-//   response.status(200).end()
-// })
+app.put('/api/users/:id', async (request, response) => {
+  try {
+    await User.update(request.body, { where: { id: request.params.id } })
+    response.status(200).end()
+  } catch (error) {
+    response.status(400).end()
+  }
+})
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, async () => {
