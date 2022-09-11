@@ -14,19 +14,9 @@ var svgCaptcha = require('svg-captcha');
 const app = express()
 const sequelize = new Sequelize(process.env.DATABASE_URL)
 
-// enable files upload
 app.use(fileUpload({
   createParentPath: true
 }));
-
-// const requestLogger = (request, response, next) => {
-//   console.log('Method:', request.method)
-//   console.log('Path:  ', request.path)
-//   console.log('Body:  ', request.body)
-//   console.log('---')
-//   next()
-// }
-
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -162,7 +152,7 @@ app.post('/api/upload', async(req, res)=>{
     } else {
       let avatar = req.files.avatar
 
-      avatar.mv(`${__dirname}/public/${avatar.name}`);
+      avatar.mv(`${__dirname}/uploaded/${avatar.name}`);
 
       res.send({
         status: true,
