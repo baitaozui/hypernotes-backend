@@ -1,51 +1,60 @@
 require('dotenv').config()
-const cors = require('cors')
-// console.log(process.env.DATABASE_URL)
-const express = require('express')
-const { Sequelize, DataTypes, Model } = require('sequelize')
+const express = require('express');
+const fileUpload = require('express-fileupload');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const morgan = require('morgan');
+const _ = require('lodash');
+const { Sequelize } = require('sequelize')
 const { User } = require('./models/User')
+const { Group } = require('./models/Group')
+const { UserGroupPair } = require('./models/UserGroupPair')
+var svgCaptcha = require('svg-captcha');
+
 const app = express()
-
-const requestLogger = (request, response, next) => {
-  console.log('Method:', request.method)
-  console.log('Path:  ', request.path)
-  console.log('Body:  ', request.body)
-  console.log('---')
-  next()
-}
-app.use(requestLogger)
-app.use(cors())
-
 const sequelize = new Sequelize(process.env.DATABASE_URL)
 
-class Group extends Model { }
-Group.init({
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  name: {
-    type: DataTypes.STRING(30),
-    allowNull: false
-  },
-  description: {
-    type: DataTypes.TEXT
-  }
-}, {
-  sequelize,
-  underscored: true,
-  timestamps: true,
-  createdAt: 'createdAt',
-  updatedAt: false,
-  modelName: 'group'
-})
+// enable files upload
+app.use(fileUpload({
+  createParentPath: true
+}));
 
+// const requestLogger = (request, response, next) => {
+//   console.log('Method:', request.method)
+//   console.log('Path:  ', request.path)
+//   console.log('Body:  ', request.body)
+//   console.log('---')
+//   next()
+// }
+
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(morgan('dev'));
 app.use(express.json())
 
 app.get('/', (request, response) => {
   response.send('<h1>Hello World!</h1>')
 })
+
+// 验证码
+app.get('/captcha', function (req, res) {
+  var captcha = svgCaptcha.create();
+  res.status(200).send([captcha.data,captcha.text]);
+});
+
+// 返回随机字符串
+app.get('/captcha/randomString', function (req, res) {
+  res.status(200).send(svgCaptcha.randomText());
+});
+
+// 根据字符串返回一副验证码图片
+app.get('/captcha/:text', function (req, res) {
+  var text = req.params.text;
+  var captcha = svgCaptcha(text);
+  res.status(200).send(captcha);
+});
+
 
 // users
 app.get('/api/users', async (request, response) => {
@@ -94,6 +103,83 @@ app.put('/api/users/:id', async (request, response) => {
     response.status(400).end()
   }
 })
+
+// groups
+app.get('/api/groups', async (request, response) => {
+  const groups = await Group.findAll()
+  response.json(groups)
+})
+
+app.get('/api/groups/:id', async (request, response) => {
+  const id = Number(request.params.id)
+  const group = await Group.findOne({ where: { id: id } })
+  if (group) {
+    response.json(group)
+  } else {
+    response.statusMessage = `Group Not Found (id: ${id})`
+    response.status(404).end()
+  }
+})
+
+// user_group
+app.get('/api/user_group', async (request, response) => {
+  const userGroupPair = await UserGroupPair.findAll()
+  response.json(userGroupPair)
+})
+
+app.get('/api/user_group/:id', async (request, response) => {
+  const id = Number(request.params.id)
+  const userGroupPair = await UserGroupPair.findOne({ where: { id: id } })
+  if (userGroupPair) {
+    response.json(userGroupPair)
+  } else {
+    response.statusMessage = `UserGroupPair Not Found (id: ${id})`
+    response.status(404).end()
+  }
+})
+
+app.delete('/api/user_group/:userId/:groupId', async (request, response) => {
+  const userId = Number(request.params.userId)
+  const groupId = Number(request.params.groupId)
+  UserGroupPair.destroy({
+    where: {
+      userId: userId,
+      groupId: groupId
+    }
+  })
+
+  response.status(204).end()
+})
+
+// 上传文件处理
+app.post('/api/upload', async(req, res)=>{
+  try {
+    if (!req.files || req.files.avatar===null) {
+      res.status(204).send({
+        status: false,
+        message: 'No file uploaded'
+      });
+    } else {
+      let avatar = req.files.avatar
+
+      avatar.mv(`${__dirname}/public/${avatar.name}`);
+
+      res.send({
+        status: true,
+        message: 'File is uploaded',
+        data: {
+          name: avatar.name,
+          mimetype: avatar.mimetype,
+          size: avatar.size
+        }
+      });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+})
+
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, async () => {
