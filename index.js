@@ -5,11 +5,13 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const _ = require('lodash');
+const jwt = require('jsonwebtoken');
 const { Sequelize } = require('sequelize')
 const { User } = require('./models/User')
 const { Group } = require('./models/Group')
 const { UserGroupPair } = require('./models/UserGroupPair')
-var svgCaptcha = require('svg-captcha');
+const svgCaptcha = require('svg-captcha');
+const { tokenSender } = require('./utils/tokenSender')
 
 const app = express()
 const sequelize = new Sequelize(process.env.DATABASE_URL)
@@ -30,7 +32,7 @@ app.get('/', (request, response) => {
 // 验证码
 app.get('/captcha', function (req, res) {
   var captcha = svgCaptcha.create();
-  res.status(200).send([captcha.data,captcha.text]);
+  res.status(200).send([captcha.data, captcha.text]);
 });
 
 // 返回随机字符串
@@ -142,9 +144,9 @@ app.delete('/api/user_group/:userId/:groupId', async (request, response) => {
 })
 
 // 上传文件处理
-app.post('/api/upload', async(req, res)=>{
+app.post('/api/upload', async (req, res) => {
   try {
-    if (!req.files || req.files.avatar===null) {
+    if (!req.files || req.files.avatar === null) {
       res.status(204).send({
         status: false,
         message: 'No file uploaded'
@@ -168,6 +170,29 @@ app.post('/api/upload', async(req, res)=>{
     console.log(err);
     res.status(500).send(err);
   }
+})
+
+// 邮箱验证
+app.post('/send', (req, res) => {
+  if (req.body && req.body.receiver) {
+    const receiver = req.body.receiver;
+    console.log(tokenSender(receiver));
+  } else {
+    res.status(204).end('信息不完整')
+  }
+})
+
+app.get('/verify/:token', (req, res) => {
+  const { token } = req.params;
+  jwt.verify(token, 'secret', function (err, decoded) {
+    if (err) {
+      console.log(err);
+      res.send("验证失败");
+    }
+    else {
+      res.send("验证成功");
+    }
+  });
 })
 
 
