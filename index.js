@@ -49,11 +49,13 @@ app.get('/captcha/:text', function (req, res) {
 
 
 // users
+// 获取所有用户
 app.get('/api/users', async (request, response) => {
   const users = await User.findAll()
   response.json(users)
 })
 
+// 获取单个yshu
 app.get('/api/users/:id', async (request, response) => {
   const id = Number(request.params.id)
   const user = await User.findOne({ where: { id: id } })
@@ -65,6 +67,7 @@ app.get('/api/users/:id', async (request, response) => {
   }
 })
 
+// 删除用户
 app.delete('/api/users/:id', async (request, response) => {
   const id = Number(request.params.id)
   User.destroy({
@@ -76,6 +79,7 @@ app.delete('/api/users/:id', async (request, response) => {
   response.status(204).end()
 })
 
+// 创建新用户
 app.post('/api/users', async (request, response) => {
   const body = request.body
   // 检验数据规范性
@@ -87,6 +91,7 @@ app.post('/api/users', async (request, response) => {
   response.json(user)
 })
 
+// 更新用户信息
 app.put('/api/users/:id', async (request, response) => {
   try {
     await User.update(request.body, { where: { id: request.params.id } })
@@ -153,16 +158,19 @@ app.post('/api/upload', async (req, res) => {
       });
     } else {
       let avatar = req.files.avatar
+      const url = `http://localhost:3001/uploaded/${avatar.name}`;
 
       avatar.mv(`${__dirname}/uploaded/${avatar.name}`);
 
+
       res.send({
         status: true,
-        message: 'File is uploaded',
+        message: '上传成功',
         data: {
           name: avatar.name,
           mimetype: avatar.mimetype,
-          size: avatar.size
+          size: avatar.size,
+          url: url
         }
       });
     }
@@ -172,15 +180,23 @@ app.post('/api/upload', async (req, res) => {
   }
 })
 
+app.get('/uploaded/:filename',(req,res)=>{
+  const root = `${__dirname}/uploaded/`
+  const filename = req.params.filename;
+  res.sendFile(root+filename);
+})
+
 // 邮箱验证
 app.post('/send', (req, res) => {
   if (req.body && req.body.receiver) {
     const receiver = req.body.receiver;
     console.log(tokenSender(receiver));
+    res.status(200).end('成功发送')
   } else {
     res.status(204).end('信息不完整')
   }
 })
+
 
 app.get('/verify/:token', (req, res) => {
   const { token } = req.params;

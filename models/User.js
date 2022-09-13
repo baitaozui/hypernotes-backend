@@ -21,8 +21,17 @@ User.init({
   email: {
     type: DataTypes.STRING(30)
   },
+  emailStatus: {
+    type: DataTypes.BOOLEAN
+  },
   password: {
     type: DataTypes.STRING(30)
+  },
+  bio: {
+    type: DataTypes.TEXT
+  },
+  avatarUrl: {
+    type: DataTypes.TEXT
   }
 }, {
   sequelize,
