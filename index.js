@@ -11,7 +11,8 @@ const { User } = require('./models/User')
 const { Group } = require('./models/Group')
 const { UserGroupPair } = require('./models/UserGroupPair')
 const svgCaptcha = require('svg-captcha');
-const { tokenSender } = require('./utils/tokenSender')
+const { tokenSender } = require('./utils/tokenSender');
+const { req } = require('express');
 
 const app = express()
 const sequelize = new Sequelize(process.env.DATABASE_URL)
@@ -25,8 +26,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(express.json())
 
-app.get('/', (request, response) => {
-  response.send('<h1>Hello World!</h1>')
+app.get('/', (req, res) => {
+  res.send('<h1>Hello World!</h1>')
 })
 
 // 验证码
@@ -50,94 +51,198 @@ app.get('/captcha/:text', function (req, res) {
 
 // users
 // 获取所有用户
-app.get('/api/users', async (request, response) => {
+app.get('/api/users', async (req, res) => {
   const users = await User.findAll()
-  response.json(users)
+  res.json(users)
 })
 
-// 获取单个yshu
-app.get('/api/users/:id', async (request, response) => {
-  const id = Number(request.params.id)
+// 获取单个用户
+app.get('/api/users/:id', async (req, res) => {
+  const id = Number(req.params.id)
   const user = await User.findOne({ where: { id: id } })
   if (user) {
-    response.json(user)
+    res.json(user)
   } else {
-    response.statusMessage = `User Not Found (id: ${id})`
-    response.status(404).end()
+    res.statusMessage = `User Not Found (id: ${id})`
+    res.status(404).end()
   }
 })
 
 // 删除用户
-app.delete('/api/users/:id', async (request, response) => {
-  const id = Number(request.params.id)
+app.delete('/api/users/:id', async (req, res) => {
+  const id = Number(req.params.id)
   User.destroy({
     where: {
       id: id
     }
   })
 
-  response.status(204).end()
+  res.status(204).end()
 })
 
 // 创建新用户
-app.post('/api/users', async (request, response) => {
-  const body = request.body
+app.post('/api/users', async (req, res) => {
+  const body = req.body
   // 检验数据规范性
   if (!body.name || !body.password) {
-    return response.status(400).json({ error: '用户信息不完整' })
+    return res.status(400).json({ error: '用户信息不完整' })
   }
 
   const user = await User.create(body)
-  response.json(user)
+  res.json(user)
 })
 
 // 更新用户信息
-app.put('/api/users/:id', async (request, response) => {
+app.put('/api/users/:id', async (req, res) => {
   try {
-    await User.update(request.body, { where: { id: request.params.id } })
-    response.status(200).end()
+    await User.update(req.body, { where: { id: req.params.id } })
+    res.status(200).end()
   } catch (error) {
-    response.status(400).end()
+    res.status(400).end()
   }
+})
+
+// TODO 获取一个用户所在的小组
+app.get('/api/users/:id/:groups', async (req, res) => {
+
 })
 
 // groups
-app.get('/api/groups', async (request, response) => {
+app.get('/api/groups', async (req, res) => {
   const groups = await Group.findAll()
-  response.json(groups)
+  res.json(groups)
 })
 
-app.get('/api/groups/:id', async (request, response) => {
-  const id = Number(request.params.id)
+app.get('/api/groups/:id', async (req, res) => {
+  const id = Number(req.params.id)
   const group = await Group.findOne({ where: { id: id } })
   if (group) {
-    response.json(group)
+    res.json(group)
   } else {
-    response.statusMessage = `Group Not Found (id: ${id})`
-    response.status(404).end()
+    res.statusMessage = `Group Not Found (id: ${id})`
+    res.status(404).end()
   }
 })
+
+// 创建小组
+app.post('/api/groups', async (req, res) => {
+  const body = req.body
+  // 检验数据规范性
+  if (!body.name || !body.description) {
+    return res.status(400).json({ error: '小组信息不完整' })
+  }
+  const group = await Group.create(body)
+  res.json(group)
+})
+
+// 删除小组
+app.delete('/api/groups/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  try {
+    // 清理user_group表
+    UserGroupPair.destroy({ where: { groupId: id } })
+    // 从groups表删除记录
+    Group.destroy({ where: { id: id } })
+    res.status(200).end()
+  } catch (error) {
+    res.status(500).end(error)
+  }
+})
+
+
+// 获取一个小组的所有成员
+app.get('/api/groups/:id/members', async (req, res) => {
+  const id = Number(req.params.id)
+  const [results, metadata] = await sequelize.query(
+    `SELECT user_id FROM user_group p,groups g WHERE p.group_id = g.id AND g.id = ${id}`
+  );
+  if (results.length > 0) {
+    let members = []
+    for (let index = 0; index < results.length; index++) {
+      const element = results[index]
+      const member = await User.findOne({ where: { 'id': element.user_id } })
+      members.push(member)
+    }
+    res.send(members)
+  }
+})
+
+// function isValidId(id, DB = User) {
+//   const result = await DB.findOne({ where: { 'id': id } })
+//   if (result) {
+//     console.log(result);
+//     return true
+//   } else {
+//     return false
+//   }
+// }
+
+// 加入新成员
+app.post('/api/groups/:id/members/:user', async (req, res) => {
+  const groupId = Number(req.params.id)
+  const userId = Number(req.params.user)
+  const userType = '组员'
+  const newPair = {
+    'userId': userId,
+    'groupId': groupId,
+    'userType': userType
+  }
+  try {
+    console.log(newPair);
+    const pair = await UserGroupPair.create(newPair)
+    res.status(200).end(pair)
+  } catch (error) {
+    console.error(error);
+    res.status(500).end()
+  }
+
+})
+
+// 删除成员
+app.delete('/api/groups/:id/members/:user', async (req, res) => {
+  const groupId = Number(req.params.id)
+  const userId = Number(req.params.user)
+  try {
+    UserGroupPair.destroy({ where: { 'userId': userId, 'groupId': groupId } })
+    res.status(200).end()
+  } catch (error) {
+    res.status(500).end()
+  }
+})
+
 
 // user_group
-app.get('/api/user_group', async (request, response) => {
+app.get('/api/user_group', async (req, res) => {
   const userGroupPair = await UserGroupPair.findAll()
-  response.json(userGroupPair)
+  res.json(userGroupPair)
 })
 
-app.get('/api/user_group/:id', async (request, response) => {
-  const id = Number(request.params.id)
+app.get('/api/user_group/:id', async (req, res) => {
+  const id = Number(req.params.id)
   const userGroupPair = await UserGroupPair.findOne({ where: { id: id } })
   if (userGroupPair) {
-    response.json(userGroupPair)
+    res.json(userGroupPair)
   } else {
-    response.statusMessage = `UserGroupPair Not Found (id: ${id})`
-    response.status(404).end()
+    res.statusMessage = `UserGroupPair Not Found (id: ${id})`
+    res.status(404).end()
   }
 })
 
-app.delete('/api/user_group/:userId/:groupId', async (request, response) => {
-  const userId = Number(request.params.userId)
-  const groupId = Number(request.params.groupId)
+app.delete('/api/user_group/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  try {
+    UserGroupPair.destroy({
+      where: { 'id': id }
+    })
+    res.status(200).end()
+  } catch (error) {
+    res.status(500).end()
+  }
+})
+
+app.delete('/api/user_group/:userId/:groupId', async (req, res) => {
+  const userId = Number(req.params.userId)
+  const groupId = Number(req.params.groupId)
   UserGroupPair.destroy({
     where: {
       userId: userId,
@@ -145,7 +250,7 @@ app.delete('/api/user_group/:userId/:groupId', async (request, response) => {
     }
   })
 
-  response.status(204).end()
+  res.status(204).end()
 })
 
 // 上传文件处理
@@ -180,10 +285,10 @@ app.post('/api/upload', async (req, res) => {
   }
 })
 
-app.get('/uploaded/:filename',(req,res)=>{
+app.get('/uploaded/:filename', (req, res) => {
   const root = `${__dirname}/uploaded/`
   const filename = req.params.filename;
-  res.sendFile(root+filename);
+  res.sendFile(root + filename);
 })
 
 // 邮箱验证
@@ -210,6 +315,8 @@ app.get('/verify/:token', (req, res) => {
     }
   });
 })
+
+// TODO annotations api
 
 
 const PORT = process.env.PORT || 3001
