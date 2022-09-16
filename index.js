@@ -102,9 +102,23 @@ app.put('/api/users/:id', async (req, res) => {
   }
 })
 
-// TODO 获取一个用户所在的小组
-app.get('/api/users/:id/:groups', async (req, res) => {
-
+// 获取一个用户所在的小组
+app.get('/api/users/:id/groups', async (req, res) => {
+  const id = req.params.id
+  const [results, metadata] = await sequelize.query(
+    `SELECT group_id FROM user_group p WHERE p.user_id = ${id}`
+  );
+  console.log('r:',results);
+  if (results.length>0) {
+    let groups = []
+    for (let index = 0; index < results.length; index++) {
+      const element = results[index];
+      console.log('e:',element);
+      const group = await Group.findOne({where: {'id':element.group_id}})
+      groups.push(group)
+    }
+    res.send(groups)
+  }
 })
 
 // groups
