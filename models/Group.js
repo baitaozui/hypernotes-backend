@@ -24,7 +24,7 @@ Group.init({
   timestamps: true,
   createdAt: 'createdAt',
   updatedAt: false,
-  modelName: 'group'
+  modelName: 'groups'
 })
 
 module.exports = { Group }

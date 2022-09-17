@@ -39,7 +39,7 @@ User.init({
   timestamps: true,
   createdAt: 'createdAt',
   updatedAt: false,
-  modelName: 'user'
+  modelName: 'users'
 })
 
 module.exports = {User}

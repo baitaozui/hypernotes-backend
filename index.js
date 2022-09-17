@@ -6,13 +6,12 @@ const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const _ = require('lodash');
 const jwt = require('jsonwebtoken');
-const { Sequelize } = require('sequelize')
+const { Sequelize, Op } = require('sequelize')
 const { User } = require('./models/User')
 const { Group } = require('./models/Group')
 const { UserGroupPair } = require('./models/UserGroupPair')
 const svgCaptcha = require('svg-captcha');
 const { tokenSender } = require('./utils/tokenSender');
-const { req } = require('express');
 
 const app = express()
 const sequelize = new Sequelize(process.env.DATABASE_URL)
@@ -108,13 +107,12 @@ app.get('/api/users/:id/groups', async (req, res) => {
   const [results, metadata] = await sequelize.query(
     `SELECT group_id FROM user_group p WHERE p.user_id = ${id}`
   );
-  console.log('r:',results);
-  if (results.length>0) {
+  if (results.length > 0) {
     let groups = []
     for (let index = 0; index < results.length; index++) {
       const element = results[index];
-      console.log('e:',element);
-      const group = await Group.findOne({where: {'id':element.group_id}})
+      console.log('e:', element);
+      const group = await Group.findOne({ where: { 'id': element.group_id } })
       groups.push(group)
     }
     res.send(groups)
@@ -123,8 +121,19 @@ app.get('/api/users/:id/groups', async (req, res) => {
 
 // groups
 app.get('/api/groups', async (req, res) => {
-  const groups = await Group.findAll()
-  res.json(groups)
+  const searchObject = req.query;
+  if (Object.keys(searchObject).length === 0) {
+    // 无搜索值返回所有小组
+    const groups = await Group.findAll()
+    res.json(groups)
+  } else {
+    // 有搜索值返回搜索结果
+    const searchValue = searchObject.value;
+    const [results, metadata] = await sequelize.query(
+      `SELECT * FROM groups WHERE CAST(id AS varchar) LIKE '%${searchValue}%' OR name LIKE '%${searchValue}%'`
+    );
+    res.send(results)
+  }
 })
 
 app.get('/api/groups/:id', async (req, res) => {
@@ -164,7 +173,7 @@ app.delete('/api/groups/:id', async (req, res) => {
 })
 
 
-// 获取一个小组的所有成员
+// TODO 获取一个小组的所有成员，包括权限信息
 app.get('/api/groups/:id/members', async (req, res) => {
   const id = Number(req.params.id)
   const [results, metadata] = await sequelize.query(
@@ -174,22 +183,20 @@ app.get('/api/groups/:id/members', async (req, res) => {
     let members = []
     for (let index = 0; index < results.length; index++) {
       const element = results[index]
-      const member = await User.findOne({ where: { 'id': element.user_id } })
+      const memberInfo = await User.findOne({ where: { 'id': element.user_id } })
+      const memberType = await UserGroupPair.findOne({
+        where: {
+          'userId': element.user_id,
+          'groupId': id
+        },
+        attributes: ['userType']
+      })
+      const member = { ...memberInfo.dataValues, ...memberType.dataValues }
       members.push(member)
     }
     res.send(members)
   }
 })
-
-// function isValidId(id, DB = User) {
-//   const result = await DB.findOne({ where: { 'id': id } })
-//   if (result) {
-//     console.log(result);
-//     return true
-//   } else {
-//     return false
-//   }
-// }
 
 // 加入新成员
 app.post('/api/groups/:id/members/:user', async (req, res) => {
@@ -201,10 +208,18 @@ app.post('/api/groups/:id/members/:user', async (req, res) => {
     'groupId': groupId,
     'userType': userType
   }
+  const pairNotExist = pair => UserGroupPair.findOne({ where: { ...pair } }).then(result => result === null)
   try {
-    console.log(newPair);
-    const pair = await UserGroupPair.create(newPair)
-    res.status(200).end(pair)
+    await pairNotExist(newPair).then(async notExistFlag => {
+      console.log(notExistFlag)
+      if (notExistFlag) {
+        const pair = await UserGroupPair.create(newPair)
+        res.status(200).send(pair)
+      } else {
+        console.error(`用户(${userId})已存在于小组(${groupId})中`)
+        res.status(400).end()
+      }
+    })
   } catch (error) {
     console.error(error);
     res.status(500).end()
