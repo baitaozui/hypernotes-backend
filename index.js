@@ -22,8 +22,14 @@ app.use(fileUpload({
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(morgan('dev'));
 app.use(express.json())
+
+// logger
+// morgan.token('body', req => {
+//   return JSON.stringify(req.body)
+// })
+// app.use(morgan('-:method :url :status :response-time ms - :res[content-length] \n--:body'))
+app.use(morgan('dev'))
 
 app.get('/', (req, res) => {
   res.send('<h1>Hello World!</h1>')
@@ -148,6 +154,10 @@ app.get('/api/groups/:id', async (req, res) => {
 })
 
 // 创建小组
+// {
+//   "name": "汪汪队",
+//   "description": "WoW"
+// }
 app.post('/api/groups', async (req, res) => {
   const body = req.body
   // 检验数据规范性
@@ -173,7 +183,7 @@ app.delete('/api/groups/:id', async (req, res) => {
 })
 
 
-// TODO 获取一个小组的所有成员，包括权限信息
+// 获取一个小组的所有成员，包括权限信息
 app.get('/api/groups/:id/members', async (req, res) => {
   const id = Number(req.params.id)
   const [results, metadata] = await sequelize.query(
@@ -199,10 +209,10 @@ app.get('/api/groups/:id/members', async (req, res) => {
 })
 
 // 加入新成员
-app.post('/api/groups/:id/members/:user', async (req, res) => {
+app.post('/api/groups/:id/members/:user/:type', async (req, res) => {
   const groupId = Number(req.params.id)
   const userId = Number(req.params.user)
-  const userType = '组员'
+  const userType = req.params.type
   const newPair = {
     'userId': userId,
     'groupId': groupId,
@@ -228,6 +238,7 @@ app.post('/api/groups/:id/members/:user', async (req, res) => {
 })
 
 // 删除成员
+// TODO 如果该成员是组长...
 app.delete('/api/groups/:id/members/:user', async (req, res) => {
   const groupId = Number(req.params.id)
   const userId = Number(req.params.user)
