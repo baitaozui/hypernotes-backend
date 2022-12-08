@@ -25,10 +25,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json())
 
 // logger
-// morgan.token('body', req => {
-//   return JSON.stringify(req.body)
-// })
-// app.use(morgan('-:method :url :status :response-time ms - :res[content-length] \n--:body'))
 app.use(morgan('dev'))
 
 app.get('/', (req, res) => {
@@ -166,6 +162,17 @@ app.post('/api/groups', async (req, res) => {
   }
   const group = await Group.create(body)
   res.json(group)
+})
+
+// 更新小组信息
+app.put('/api/groups/:id',async (req,res)=>{
+  const id = Number(req.params.id);
+  try {
+    await Group.update(req.body, { where: { id: req.params.id } })
+    res.status(200).end()
+  }catch(error){
+    res.status(500).end(error)
+  }
 })
 
 // 删除小组
@@ -306,7 +313,6 @@ app.post('/api/upload', async (req, res) => {
       const url = `http://localhost:3001/uploaded/${avatar.name}`;
 
       avatar.mv(`${__dirname}/uploaded/${avatar.name}`);
-
 
       res.send({
         status: true,
