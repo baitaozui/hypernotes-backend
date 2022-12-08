@@ -1,0 +1,29 @@
+POST http://localhost:3001/api/users
+Content-Type: application/json
+
+{
+    "name": "Mary",
+    "password": "SuqK",
+    "email": "y.qgqlwk@djpxl.ar",
+    "displayName": "文艳"
+}
+
+###
+POST http://localhost:3001/api/groups
+Content-Type: application/json
+
+{
+    "name": "汪汪队",
+    "description": "WoW"
+}
+
+###
+POST http://localhost:3001/send
+Content-Type: application/json
+
+{
+    "receiver": "xiaohuabeta@gmail.com"
+}
+
+###
+POST http://localhost:3001/api/groups/5/members/3

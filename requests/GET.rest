@@ -1,0 +1,13 @@
+GET http://localhost:3001/api/users
+
+###
+GET http://localhost:3001/api/users/1/groups
+
+### 
+GET http://localhost:3001/api/groups
+
+###
+GET http://localhost:3001/api/groups/2/members
+
+###
+GET http://localhost:3001/api/user_group
